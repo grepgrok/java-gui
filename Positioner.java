@@ -448,4 +448,36 @@ public class Positioner {
     public static Rectangle bottomRight(Rectangle ref, int width, int height) {
         return corner(ref, new Dimension(width, height), Corner.BOTTOM_RIGHT, SPACER);
     }
+
+    /**
+     * @param ref    Reference to place in
+     * @return Standard rectangle in the top-left corner of ref
+     */
+    public static Rectangle topLeft(Rectangle ref) {
+        return corner(ref, new Dimension(WIDTH, HEIGHT), Corner.TOP_LEFT, SPACER);
+    }
+    
+    /**
+     * @param ref    Reference to place in
+     * @return Standard rectangle in the top-right corner of ref
+     */
+    public static Rectangle topRight(Rectangle ref) {
+        return corner(ref, new Dimension(WIDTH, HEIGHT), Corner.TOP_RIGHT, SPACER);
+    }
+    
+    /**
+     * @param ref    Reference to place in
+     * @return Standard rectangle in the bottom-left corner of ref
+     */
+    public static Rectangle bottomLeft(Rectangle ref) {
+        return corner(ref, new Dimension(WIDTH, HEIGHT), Corner.BOTTOM_LEFT, SPACER);
+    }
+    
+    /**
+     * @param ref    Reference to place in
+     * @return Standard rectangle in the bottom-right corner of ref
+     */
+    public static Rectangle bottomRight(Rectangle ref) {
+        return corner(ref, new Dimension(WIDTH, HEIGHT), Corner.BOTTOM_RIGHT, SPACER);
+    }
 }

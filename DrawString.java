@@ -94,7 +94,7 @@ public class DrawString {
      * Draw text positioned relative to a reference
      * 
      * @param dir    Side
-     * @param j      Alignment
+     * @param j      Justification (Justify.END aligns rightmost of ref and text NOT right alignment)
      * @param text   Text to draw
      * @param ref    Reference to position against
      * @param parse Whether or not to parse the text
