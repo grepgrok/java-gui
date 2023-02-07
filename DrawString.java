@@ -4,7 +4,6 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Rectangle;
-
 import java.util.ArrayList;
 import java.util.Optional;
 
@@ -35,48 +34,85 @@ public class DrawString {
         last = new Rectangle();
     }
 
+    /**
+     * Getters
+     */
+
+     /**
+      * @return Bounds of the last drawn item
+      */
     public Rectangle last() {
         return last;
     }
 
-    public int setTabLength(int length) {
-        tabLength = length;
-        return tabLength;
-    }
-
-    public int setTabLength(String tabSizer) {
-        tabLength = width(tabSizer);
-        return tabLength;
-    }
-
+    /**
+     * @return Height of a line of text
+     */
     public int height() {
         return height;
     }
 
+    /**
+     * @param text
+     * @return Width of <code>text</text>
+     */
     public int width(String text) {
         return g.getFontMetrics().stringWidth(text);
     }
 
     /**
-     * @param dir   Relative direction of the text to comp
-     * @param j     Justification to position the text: start, center, end
-     * @param text  Test to draw
-     * @param comp   Relative component
-     * @return Whether or not the text was drawn, as determined by comp.isVisible()
+     * Setters
      */
-    public Rectangle positionText(Direction dir, Justify j, String text, Rectangle ref) {
-        // Text may need formatting
-        ArrayList<Pair<String, Point>> lines = formattedLines(text, 0, 0);
 
-        // Since Positioner.positioned needs the width and height of the target rectangle, we need to find the max width
-        int maxWidth = width(lines.get(0).getKey());
-        last = Positioner.positioned(
-                new Positional(dir, j), 
-                ref, 
-                new Dimension(width(text), height), 
-                0
-            );
+    /**
+     * Set how big tabs are
+     * 
+     * @param length the length
+     * @return tab length
+     */
+    public int setTabLength(int length) {
+        tabLength = length;
+        return tabLength;
+    }
 
+    /**
+     * Set how big tabs are
+     * 
+     * @param tabSizer String with equal width to a tab
+     * @return tab length
+     */
+    public int setTabLength(String tabSizer) {
+        tabLength = width(tabSizer);
+        return tabLength;
+    }
+
+    /**
+     * Drawing actions
+     */
+
+    /**
+     * Draw text positioned relative to a reference
+     * 
+     * @param dir    Side
+     * @param j      Alignment
+     * @param text   Text to draw
+     * @param ref    Reference to position against
+     * @param parse Whether or not to parse the text
+     * @return The rectangle containing this (also saved in <code>last</code>)
+     */
+    public Rectangle drawPositionedText(Direction dir, Justify j, String text, Rectangle ref, boolean parse) {
+        // (Possibly parse lines)
+        ArrayList<Pair<String, Point>> lines;
+        if (parse) {
+            lines = parsedLines(text, new Point(0, 0));
+
+        } else {
+            lines = new ArrayList<>();
+            lines.add(new Pair<>(text, new Point(0, 0)));
+        }
+
+        // get max line width
+        int maxWidth = -1;
         for (Pair<String, Point> line : lines) {
             int width = width(line.getKey());
             if (width > maxWidth) {
@@ -84,61 +120,138 @@ public class DrawString {
             }
         }
 
-        // height = final line y - first line y + additional line height
-        int height_net = lines.get(lines.size()-1).getValue().y - lines.get(0).getValue().y + height;
+        // height =      final line y                              - first line y               + line height
+        int height_net = lines.get(lines.size() - 1).getValue().y - lines.get(0).getValue().y + height;
 
-        Rectangle pos = Positioner.positioned(new Positional(dir, j), ref, new Dimension(maxWidth, height_net), 0);
+        // Finally position the text relative to ref
+        last = Positioner.positioned(new Positional(dir, j), ref, new Dimension(maxWidth, height_net), 0);
 
-        controlledDraw(lines, pos.x, pos.y);
+        controlledDraw(lines, last.x, last.y);
 
         return last;
     }
-    public Optional<Rectangle> positionText(Direction dir, Justify j, String text, JComponent comp) {
-        if (comp.isVisible()) {
-            Rectangle ref = comp.getBounds();
-            // DrawString works off the bottom-left corner of the text, so we have to move down the height
-            // but height actually includes a bit of white space at the top, so to have the
-            // text nicely centered in the box, we have to move it up a little; therefore, use 3/4 height
-            ref.translate(0, 3 * height / 4);
-            return Optional.of(positionText(dir, j, text, ref));
-            
-        } else {
-            return Optional.ofNullable(null);
+
+    /**
+     * Draw text positioned relative to a reference component. This will only draw
+     * if <code>comp</code> is visible
+     * 
+     * @param dir    Relative direction of the text to comp
+     * @param j      Justification to position the text: start, center, end
+     * @param text   Test to draw
+     * @param comp   Relative component
+     * @param parse Whether or not to parse the text
+     * @return Rectangle bounding the drawn text, or empty if <code>comp</code> is
+     *         not visible
+     */
+    public Optional<Rectangle> drawPositionedText(Direction dir, Justify j, String text, JComponent comp, boolean parse) {
+        if (!comp.isVisible()) {
+            return Optional.ofNullable(null);   
         }
+
+        Rectangle ref = comp.getBounds();
+        // Have to adjust bc weird spacing and positioning
+        ref.translate(0, 3 * height / 4);
+        return Optional.of(drawPositionedText(dir, j, text, ref, parse));
     }
 
-    public Optional<Rectangle> leftText(String text, JComponent comp) {
-        return positionText(Direction.LEFT, Justify.CENTER, text, comp);
+    /**
+     * Draw flush to the left of a component
+     * 
+     * @param text
+     * @param comp
+     * @return Rectangle bounding the drawn text, or empty if <code>comp</code> is
+     *         not visible
+     */
+    public Optional<Rectangle> drawLeft(String text, JComponent comp) {
+        return drawPositionedText(Direction.LEFT, Justify.CENTER, text, comp, true);
     }
 
-    public Optional<Rectangle> topText(String text, JComponent comp) {
-        return positionText(Direction.UP, Justify.CENTER, text, comp);
+    /**
+     * Draw flush on top of a component
+     * 
+     * @param text
+     * @param comp
+     * @return Rectangle bounding the drawn text, or empty if <code>comp</code> is
+     *         not visible
+     */
+    public Optional<Rectangle> drawAbove(String text, JComponent comp) {
+        return drawPositionedText(Direction.UP, Justify.CENTER, text, comp, true);
     }
 
-    public Optional<Rectangle> rightText(String text, JComponent comp) {
-        return positionText(Direction.RIGHT, Justify.CENTER, text, comp);
+    /**
+     * Draw flush to the right of a component
+     * 
+     * @param text
+     * @param comp
+     * @return Rectangle bounding the drawn text, or empty if <code>comp</code> is
+     *         not visible
+     */
+    public Optional<Rectangle> drawRight(String text, JComponent comp) {
+        return drawPositionedText(Direction.RIGHT, Justify.CENTER, text, comp, true);
     }
 
-    public Optional<Rectangle> bottomText(String text, JComponent comp) {
-        return positionText(Direction.DOWN, Justify.START, text, comp);
+    /**
+     * Draw flush under a component
+     * 
+     * @param text
+     * @param comp
+     * @return Rectangle bounding the drawn text, or empty if <code>comp</code> is
+     *         not visible
+     */
+    public Optional<Rectangle> drawUnder(String text, JComponent comp) {
+        return drawPositionedText(Direction.DOWN, Justify.START, text, comp, true);
     }
 
-    public Rectangle leftText(String text, Rectangle comp) {
-        return positionText(Direction.LEFT, Justify.START, text, comp);
+    /**
+     * Draw flush to the left of a reference rectangle
+     * 
+     * @param text
+     * @param ref
+     * @return Rectangle bounding the drawn text
+     */
+    public Rectangle drawLeft(String text, Rectangle ref) {
+        return drawPositionedText(Direction.LEFT, Justify.START, text, ref, true);
     }
 
-    public Rectangle topText(String text, Rectangle comp) {
-        return positionText(Direction.UP, Justify.START, text, comp);
+    /**
+     * Draw flush on top of of a reference rectangle
+     * 
+     * @param text
+     * @param ref
+     * @return Rectangle bounding the drawn text
+     */
+    public Rectangle drawAbove(String text, Rectangle ref) {
+        return drawPositionedText(Direction.UP, Justify.START, text, ref, true);
     }
 
-    public Rectangle rightText(String text, Rectangle comp) {
-        return positionText(Direction.RIGHT, Justify.START, text, comp);
+    /**
+     * Draw flush to the right of a reference rectangle
+     * 
+     * @param text
+     * @param ref
+     * @return Rectangle bounding the drawn text
+     */
+    public Rectangle drawRight(String text, Rectangle ref) {
+        return drawPositionedText(Direction.RIGHT, Justify.START, text, ref, true);
     }
 
-    public Rectangle bottomText(String text, Rectangle comp) {
-        return positionText(Direction.DOWN, Justify.START, text, comp);
+    /**
+     * Draw flush under a reference rectangle
+     * 
+     * @param text
+     * @param ref
+     * @return Rectangle bounding the drawn text
+     */
+    public Rectangle drawUnder(String text, Rectangle ref) {
+        return drawPositionedText(Direction.DOWN, Justify.START, text, ref, true);
     }
 
+    /**
+     * Easy, fast way to draw a set of lines
+     * @param lines
+     * @param start
+     * @return Position for a line just under these
+     */
     public Point drawLines(String[] lines, Point start) {
         // Could use controlledDraw, but this is more efficient
         for (String line : lines) {
@@ -148,25 +261,47 @@ public class DrawString {
 
         return start;
     }
+
+    /**
+     * Easy, fast way to draw a set of lines
+     * 
+     * @param lines
+     * @param x
+     * @param y
+     * @return Position for a line just under these
+     */
     public Point drawLines(String[] lines, int x, int y) {
         return drawLines(lines, new Point(x, y));
     }
 
-    public Point drawLines(ArrayList<String> lines, int x, int y) {
-        return drawLines(lines.toArray(new String[0]), x, y);
+    /**
+     * Draw text in a parsed way. Note that this is positioned in accordance to
+     * normal <code>Graphics</code> draw methods like
+     * <code>Graphics.drawRect()</code>. That is to say, it draws from the top left
+     * of the text.
+     * 
+     * @param text Text to draw
+     * @param x    Starting x position
+     * @param y    Starting y position
+     * @return Rectangle bounding the drawn text
+     */
+    public Rectangle drawString(String text, int x, int y) {
+        return controlledDraw(parsedLines(text, new Point(x, y + height)), 0, height);
     }
 
-    public Point drawLines(ArrayList<String> lines, Point p) {
-        return drawLines(lines, p);
-    }
+    /**
+     * Private Methods
+     */
 
-    public Rectangle drawFormattedLines(String text, int x, int y) {
-        return controlledDraw(formattedLines(text, x, y), 0, height);
-    }
-
-    private ArrayList<Pair<String, Point>> formattedLines(String text, Point start) {
-        Point originalPoint = (Point) start.clone();
-        ArrayList<Pair<String, Point>> lines = new ArrayList<Pair<String, Point>>();
+    /**
+     * @param text  Text to parse
+     * @param start Starting (x, y)
+     * @return List of strings and points representing the text broken up according
+     *         to the escaped characters
+     */
+    private ArrayList<Pair<String, Point>> parsedLines(String text, Point start) {
+        Point originalPoint = (Point)start.clone();
+        ArrayList<Pair<String, Point>> lines = new ArrayList<>();
         
         for (String line : text.split("\n")) {
             ArrayList<Pair<String, Point>> parsedLines = parseLine(line, start);
@@ -178,13 +313,18 @@ public class DrawString {
         return lines;
     }
 
-    private ArrayList<Pair<String, Point>> formattedLines(String text, int x, int y) {
-        return formattedLines(text, new Point(x, y));
-    }
-
+    /**
+     * Parses the escaped characters of a single line. Presuposes newlines have been
+     * removed.
+     * 
+     * @param line  Line to parse
+     * @param start Starting (x, y)
+     * @return List of strings and points representing the text broken up according
+     *         to the escaped characters
+     */
     private ArrayList<Pair<String, Point>> parseLine(String line, Point start) {
-        /*
-         * Break up most escape sequences
+        /**
+         * Break up most escape sequences (except tab)
          */
         ArrayList<Pair<String, Point>> strings = new ArrayList<Pair<String, Point>>();
         StringBuilder currentWord = new StringBuilder();
@@ -239,7 +379,7 @@ public class DrawString {
                 (Point) start.clone())
             );
 
-        /*
+        /**
          * Dealing with Tabs
          */
         ArrayList<Pair<String, Point>> res = new ArrayList<Pair<String, Point>>();
@@ -279,7 +419,16 @@ public class DrawString {
 
         return res;
     }
-    public Rectangle controlledDraw(ArrayList<Pair<String, Point>> strings, int offsetX, int offsetY) {
+    
+    /**
+     * Draw a bunch of lines
+     * 
+     * @param strings Lines to draw
+     * @param offsetX How much to offset the lines in the x direction
+     * @param offsetY How much to offset the lines in the y direction
+     * @return Rectangle bounding the drawn lines
+     */
+    private Rectangle controlledDraw(ArrayList<Pair<String, Point>> strings, int offsetX, int offsetY) {
         Pair<String, Point> first = strings.get(0);
         Rectangle container = new Rectangle(
                 first.getValue().x, 
@@ -289,40 +438,31 @@ public class DrawString {
             );
 
         for (Pair<String, Point> pair : strings) {
-            // ! Leave this for troubleshooting
-            // System.out.println("Pair:");
-            // System.out.println(pair.getKey() + " <:> " + pair.getValue());
-
             Point pos = pair.getValue();
+            // Update size as needed
             if (pos.y + height > container.y + container.height) {
                 container.setSize(container.width, pos.y + height - container.y);
             }
-
-            if (pos.y < container.y) {
-                container.setLocation(container.x, pos.y);
-            }
-
-            if (pos.x < container.x) {
-                container.setLocation(pos.x, container.y);
-            }
-
             int testWidth = pos.x + width(pair.getKey());
             if (testWidth > container.x + container.width) {
                 container.setSize(testWidth, container.height);
             }
 
+            // Update position as needed
+            if (pos.y < container.y) {
+                container.setLocation(container.x, pos.y);
+            }
+            if (pos.x < container.x) {
+                container.setLocation(pos.x, container.y);
+            }
+
             g.drawString(
-                    pair.getKey(), 
-                    pair.getValue().x + offsetX, 
-                    pair.getValue().y + offsetY
-                );
+                pair.getKey(), 
+                pair.getValue().x + offsetX, 
+                pair.getValue().y + offsetY
+            );
         }
 
-        last = container;
-        return container;
-    }
-
-    public Rectangle controlledDraw(ArrayList<Pair<String, Point>> strings) {
-        return controlledDraw(strings, 0, 0);
+        return last = container;
     }
 }
